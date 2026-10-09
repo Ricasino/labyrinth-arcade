@@ -1,23 +1,23 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://ddjr0bskauhtj"]
 
-[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
-[ext_resource type="Script" path="res://scripts/maze.gd" id="2_maze"]
+[ext_resource type="Script" uid="uid://ds13qdcdufd8f" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" uid="uid://buhbpe3cjhu8v" path="res://scripts/maze.gd" id="2_maze"]
 [ext_resource type="PackedScene" path="res://scenes/exit.tscn" id="3_exit"]
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="4_player"]
 [ext_resource type="PackedScene" path="res://scenes/hud.tscn" id="5_hud"]
 [ext_resource type="PackedScene" path="res://scenes/touch_controls.tscn" id="6_touch"]
 
-[node name="Main" type="Node2D"]
+[node name="Main" type="Node2D" unique_id=1719102481]
 script = ExtResource("1_main")
 
-[node name="Maze" type="Node2D" parent="."]
+[node name="Maze" type="Node2D" parent="." unique_id=1198721265]
 script = ExtResource("2_maze")
 
-[node name="Exit" parent="." instance=ExtResource("3_exit")]
+[node name="Exit" parent="." unique_id=686948617 instance=ExtResource("3_exit")]
 
-[node name="Player" parent="." node_paths=PackedStringArray("maze") instance=ExtResource("4_player")]
+[node name="Player" parent="." unique_id=251706883 node_paths=PackedStringArray("maze") instance=ExtResource("4_player")]
 maze = NodePath("../Maze")
 
-[node name="HUD" parent="." instance=ExtResource("5_hud")]
+[node name="HUD" parent="." unique_id=1165516910 instance=ExtResource("5_hud")]
 
-[node name="TouchControls" parent="." instance=ExtResource("6_touch")]
+[node name="TouchControls" parent="." unique_id=1413840080 instance=ExtResource("6_touch")]
