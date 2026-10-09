@@ -1,0 +1,23 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/maze.gd" id="2_maze"]
+[ext_resource type="PackedScene" path="res://scenes/exit.tscn" id="3_exit"]
+[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="4_player"]
+[ext_resource type="PackedScene" path="res://scenes/hud.tscn" id="5_hud"]
+[ext_resource type="PackedScene" path="res://scenes/touch_controls.tscn" id="6_touch"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_main")
+
+[node name="Maze" type="Node2D" parent="."]
+script = ExtResource("2_maze")
+
+[node name="Exit" parent="." instance=ExtResource("3_exit")]
+
+[node name="Player" parent="." node_paths=PackedStringArray("maze") instance=ExtResource("4_player")]
+maze = NodePath("../Maze")
+
+[node name="HUD" parent="." instance=ExtResource("5_hud")]
+
+[node name="TouchControls" parent="." instance=ExtResource("6_touch")]
