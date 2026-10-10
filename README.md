@@ -39,11 +39,50 @@ svolta automaticamente alla prima apertura.
 
 ---
 
+## Giocare sul telefono (versione web)
+
+Il gioco è pubblicato come pagina web, all'indirizzo:
+
+**<https://ricasino.github.io/labyrinth-arcade/>**
+
+- Si apre dal browser di qualsiasi telefono, tablet o PC, senza installare
+  niente. Sui telefoni compare da sola la croce direzionale touch.
+- **Si aggiorna da solo:** ogni volta che fai un Push sul ramo `main`, GitHub
+  esporta di nuovo il gioco e lo ripubblica. Ci vogliono 2-3 minuti;
+  l'avanzamento si vede nella scheda **Actions** della repository su GitHub.
+- **Come un'app:** dal browser puoi aggiungerlo alla schermata Home
+  (Chrome: menu **⋮ → Aggiungi a schermata Home**; Samsung Internet: menu
+  **≡ → Aggiungi pagina a → Schermata Home**). Si apre a schermo intero, in
+  orizzontale, con la sua icona.
+- **Non vedi le ultime modifiche?** Chiudi del tutto il gioco e riaprilo,
+  a volte due volte: la versione installata tiene una copia del gioco per
+  partire più in fretta e scarica quella nuova in sottofondo.
+
+### Come funziona
+
+- `export_presets.cfg` contiene il preset **Web**: le impostazioni che Godot
+  usa per trasformare il progetto in una pagina web (lo trovi anche in
+  *Progetto → Esporta…*).
+- `.github/workflows/pubblica-web.yml` è un'automazione di **GitHub
+  Actions**: a ogni Push un computer di GitHub scarica Godot, esporta il gioco
+  con quel preset e lo pubblica su **GitHub Pages**, il servizio di GitHub per
+  i siti web. Sulle pull request esporta il gioco senza pubblicarlo, per
+  controllare che funzioni ancora.
+
+GitHub Pages va attivato una volta sola, in **Settings → Pages → Source:
+GitHub Actions**. Con un account gratuito funziona solo se la repository è
+pubblica.
+
+---
+
 ## Struttura delle cartelle
 
 ```
 labyrinth-arcade/
 ├── project.godot              Configurazione del progetto (finestra, input, scena iniziale)
+├── export_presets.cfg         Impostazioni per esportare il gioco come pagina web
+├── .github/workflows/
+│   └── pubblica-web.yml       Automazione: pubblica il gioco online a ogni Push
 ├── icon.svg                   Icona del gioco
 ├── scenes/                    Le scene (.tscn): "come sono fatti" gli oggetti
 │   ├── main.tscn              Scena principale: mette insieme tutte le altre
@@ -258,5 +297,6 @@ Piccoli esercizi, in ordine di difficoltà, per prendere confidenza:
    limite per livello e aggiungi una schermata di game over.
 5. **Grafica con le tile**: sostituisci il disegno da codice con un nodo
    `TileMapLayer` e un `TileSet` disegnato da te.
-6. **Esporta** il gioco per Android o per il web: *Progetto → Esporta*
-   (servono i "template di esportazione", che Godot può scaricare da solo).
+6. **App Android**: esporta il gioco anche come app da installare
+   (*Progetto → Esporta… → Aggiungi… → Android*; servono gli strumenti di
+   Android sul PC).

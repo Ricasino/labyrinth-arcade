@@ -1,0 +1,89 @@
+# Automazione di GitHub ("GitHub Actions").
+#
+# Ogni volta che arrivano modifiche sul ramo main (per esempio con un Push da
+# GitHub Desktop), un computer di GitHub:
+#   1. scarica il progetto e Godot;
+#   2. esporta il gioco per il browser (preset "Web" in export_presets.cfg);
+#   3. lo pubblica su GitHub Pages, all'indirizzo
+#      https://ricasino.github.io/labyrinth-arcade/
+#
+# L'andamento si vede nella scheda "Actions" della repository su GitHub.
+name: Pubblica la versione web
+
+on:
+  push:
+    branches: [main]
+  # Sulle pull request esporta il gioco senza pubblicarlo: serve a
+  # controllare che le modifiche non abbiano rotto niente.
+  pull_request:
+  # Permette di avviarla anche a mano dalla scheda "Actions".
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Se arrivano due Push ravvicinati, si pubblica solo il più recente.
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: "4.7.2"
+
+jobs:
+  esporta:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scarica il progetto
+        uses: actions/checkout@v5
+
+      # Godot e i modelli di esportazione vengono conservati in una cache,
+      # così non vanno riscaricati (più di 1 GB) a ogni esecuzione.
+      - name: Recupera Godot dalla cache
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/.local/share/godot/export_templates
+          key: godot-${{ env.GODOT_VERSION }}-web
+
+      - name: Scarica Godot e il modello di esportazione web
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot
+          curl -fsSL -o godot.zip "https://downloads.godotengine.org/?version=${GODOT_VERSION}&flavor=stable&slug=linux.x86_64.zip&platform=linux.64"
+          unzip -q godot.zip -d ~/godot
+          mv ~/godot/Godot_v*_linux.x86_64 ~/godot/godot
+          curl -fsSL -o templates.tpz "https://downloads.godotengine.org/?version=${GODOT_VERSION}&flavor=stable&slug=export_templates.tpz&platform=templates"
+          TEMPLATES_DIR=~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          mkdir -p "$TEMPLATES_DIR"
+          unzip -q -j templates.tpz templates/web_nothreads_release.zip templates/version.txt -d "$TEMPLATES_DIR"
+          rm godot.zip templates.tpz
+
+      - name: Esporta il gioco
+        run: |
+          ~/godot/godot --headless --import
+          mkdir -p build/web
+          ~/godot/godot --headless --export-release "Web" build/web/index.html
+          test -f build/web/index.pck
+
+      - name: Prepara i file da pubblicare
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: build/web
+
+  pubblica:
+    if: github.event_name != 'pull_request'
+    needs: esporta
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Pubblica su GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
