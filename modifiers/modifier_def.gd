@@ -17,3 +17,17 @@ extends Resource
 @export var min_level := 2
 # Quanto spesso esce rispetto alle altre: 2 = il doppio di 1, 0 = mai.
 @export_range(0.0, 10.0, 0.1) var weight := 1.0
+# Etichette per evitare combinazioni impossibili o troppo confuse: due
+# varianti con un'etichetta in comune non escono mai nello stesso livello.
+# Per esempio tutte quelle con dei nemici hanno l'etichetta "nemici".
+@export var tags: PackedStringArray = []
+
+
+# true se questa variante può stare nello stesso livello di `other`.
+func is_compatible_with(other: ModifierDef) -> bool:
+	if other == self:
+		return false
+	for tag in tags:
+		if other.tags.has(tag):
+			return false
+	return true

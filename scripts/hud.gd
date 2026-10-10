@@ -16,6 +16,7 @@ extends CanvasLayer
 @onready var _level_label: Label = %LevelLabel
 @onready var _time_label: Label = %TimeLabel
 @onready var _twist_label: Label = %TwistLabel
+@onready var _info_label: Label = %InfoLabel
 @onready var _message_label: Label = %MessageLabel
 
 var _message_tween: Tween
@@ -29,9 +30,14 @@ func set_time(seconds: float) -> void:
 	_time_label.text = format_time(seconds)
 
 
-# Mostra in alto al centro il nome della variante del livello ("" = nessuna).
+# Mostra in alto al centro il nome delle varianti del livello ("" = nessuna).
 func set_twist(title: String) -> void:
 	_twist_label.text = title
+
+
+# Riga di informazioni sotto il titolo, per esempio "Stelle 2/5".
+func set_info(text: String) -> void:
+	_info_label.text = text
 
 
 # Mostra un messaggio al centro dello schermo e lo fa svanire dopo `duration`

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ModifierDef" format=3]
+
+[ext_resource type="Script" path="res://modifiers/modifier_def.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://modifiers/ice/ice.tscn" id="2_scene"]
+
+[resource]
+script = ExtResource("1_def")
+title = "Ghiaccio"
+description = "Scivoli! Ti fermi solo contro i muri e agli incroci."
+scene = ExtResource("2_scene")
+min_level = 3
+weight = 1.0
+tags = PackedStringArray("movimento")

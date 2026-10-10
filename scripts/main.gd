@@ -3,12 +3,12 @@
 # Non disegna niente e non muove niente direttamente: coordina gli altri nodi.
 # - chiede a Maze di generare un labirinto;
 # - mette Player e Exit al posto giusto;
-# - pesca una variante (una regola speciale) e la aggiunge al livello;
+# - pesca una o più varianti (regole speciali) e le aggiunge al livello;
 # - conta il tempo e aggiorna l'HUD;
 # - quando il giocatore raggiunge l'uscita, passa al livello successivo.
 #
 # Con `class_name Game` le varianti possono scrivere `var game: Game` e usare
-# le variabili pubbliche qui sotto (maze, player, hud, ...).
+# le variabili e le funzioni pubbliche qui sotto (maze, player, hud, ...).
 class_name Game
 extends Node2D
 
@@ -22,15 +22,26 @@ extends Node2D
 # Spazio vuoto (in pixel) che la telecamera lascia attorno al labirinto.
 @export var camera_margin := 64
 
+@export_group("Varianti")
 # Le varianti che il gioco può pescare. Per aggiungerne una nuova: crea la sua
 # cartella in modifiers/ (scena, script e scheda .tres), poi trascina la
 # scheda in questa lista dall'Inspector del nodo Main.
 @export var modifier_defs: Array[ModifierDef] = []
-# Da questo livello in poi ogni labirinto ha una variante.
+# Da questo livello in poi ogni labirinto ha almeno una variante...
 @export var first_modifier_level := 2
+# ...da questo livello spesso due insieme...
+@export var double_modifier_level := 5
+# ...e da questo a volte tre.
+@export var triple_modifier_level := 9
 # Per provare una variante: se la imposti qui, esce a ogni livello (anche al
 # primo) al posto della scelta casuale. Lasciala vuota per giocare normalmente.
 @export var forced_modifier: ModifierDef
+
+@export_group("Nemici")
+# Secondi aggiunti al tempo quando un nemico ti prende.
+@export var catch_penalty := 3.0
+# Dopo essere stato preso, per questi secondi non si può essere ripresi.
+@export var catch_grace_time := 1.5
 
 # `$NomeNodo` è una scorciatoia per get_node("NomeNodo"): trova un figlio
 # tramite il suo percorso nella scena. Queste variabili sono pubbliche (senza
@@ -48,9 +59,15 @@ var level := 0
 
 var _elapsed := 0.0
 var _timer_running := false
-# Le varianti attive nel livello in corso, e la scheda dell'ultima pescata.
+# Le varianti attive nel livello in corso, e le schede di quelle del livello
+# precedente (per non ripeterle subito).
 var _modifiers: Array[LevelModifier] = []
-var _last_modifier_def: ModifierDef
+var _last_defs: Array[ModifierDef] = []
+# Caselle già occupate da qualcosa (stelle, chiavi, portali...), usato come
+# "insieme": la chiave è la casella, il valore non conta.
+var _reserved_cells := {}
+# Momento (in secondi di gioco) in cui il giocatore potrà di nuovo essere preso.
+var _catchable_after := 0.0
 
 
 # _ready viene chiamata una volta, quando il nodo e tutti i suoi figli sono
@@ -72,6 +89,14 @@ func _process(delta: float) -> void:
 		_elapsed += delta
 		hud.set_time(_elapsed)
 
+	# Le varianti possono mostrare una riga di stato (es. "Stelle 2/5").
+	var texts: PackedStringArray = []
+	for modifier in _modifiers:
+		var text := modifier.status_text()
+		if text != "":
+			texts.append(text)
+	hud.set_info("     ".join(texts))
+
 
 # true se il giocatore può entrare nella casella: non deve essere un muro e
 # nessuna variante deve bloccarla.
@@ -84,6 +109,48 @@ func can_enter(cell: Vector2i) -> bool:
 	return true
 
 
+# Un nemico ha preso il giocatore: torna alla partenza e il tempo aumenta.
+func catch_player() -> void:
+	if not _timer_running or _elapsed < _catchable_after:
+		return
+	_catchable_after = _elapsed + catch_grace_time
+	_elapsed += catch_penalty
+	player.place_at(maze.start_cell)
+	_camera.reset_smoothing()
+	hud.show_message("Preso!\n+%d secondi" % catch_penalty, 1.0)
+	for modifier in _modifiers:
+		modifier.player_caught()
+
+
+# Sceglie `count` stanze libere a caso per metterci degli oggetti, e le segna
+# come occupate così due varianti non mettono cose nella stessa casella.
+# Le stanze sono ad almeno `min_distance` caselle dalla partenza. Con
+# `prefer_dead_ends` sceglie prima i vicoli ciechi (bisogna esplorare!).
+func pick_rooms(count: int, min_distance := 3.0, prefer_dead_ends := false) -> Array[Vector2i]:
+	var candidates: Array[Vector2i] = []
+	for room in maze.get_rooms():
+		if not _reserved_cells.has(room) and Vector2(room - maze.start_cell).length() >= min_distance:
+			candidates.append(room)
+	shuffle(candidates)
+	if prefer_dead_ends:
+		# sort_custom ordina con una funzione: qui mette prima i vicoli ciechi.
+		candidates.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+			return maze.count_exits(a) == 1 and maze.count_exits(b) != 1)
+
+	var picked: Array[Vector2i] = candidates.slice(0, count)
+	for room in picked:
+		reserve_cell(room)
+	return picked
+
+
+func reserve_cell(cell: Vector2i) -> void:
+	_reserved_cells[cell] = true
+
+
+func is_reserved(cell: Vector2i) -> bool:
+	return _reserved_cells.has(cell)
+
+
 func _start_level(new_level: int) -> void:
 	level = new_level
 	_remove_modifiers()
@@ -94,7 +161,12 @@ func _start_level(new_level: int) -> void:
 
 	exit_marker.position = maze.cell_to_position(maze.exit_cell)
 	exit_marker.size = maze.tile_size
+	exit_marker.locked = false
+	player.reset_effects()
 	player.place_at(maze.start_cell)
+	_reserved_cells.clear()
+	reserve_cell(maze.start_cell)
+	reserve_cell(maze.exit_cell)
 
 	_update_camera_limits()
 	# La telecamera di solito "insegue" il giocatore con un movimento morbido;
@@ -102,44 +174,69 @@ func _start_level(new_level: int) -> void:
 	_camera.reset_smoothing()
 
 	_elapsed = 0.0
+	_catchable_after = 0.0
 	_timer_running = true
 	hud.set_level(level)
 	hud.set_time(_elapsed)
 
-	var modifier_def := _pick_modifier_def()
-	if modifier_def:
+	var defs := _pick_modifier_defs()
+	_last_defs = defs
+	var titles: PackedStringArray = []
+	var message := "Livello %d" % level
+	for modifier_def in defs:
 		_add_modifier(modifier_def)
-		hud.set_twist(modifier_def.title)
-		hud.show_message("Livello %d\n%s\n%s" % [level, modifier_def.title, modifier_def.description], 3.0)
+		titles.append(modifier_def.title)
+		message += "\n%s: %s" % [modifier_def.title, modifier_def.description]
+	hud.set_twist(" + ".join(titles))
+	if defs.is_empty():
+		hud.show_message(message + "\nRaggiungi l'uscita!")
 	else:
-		hud.set_twist("")
-		hud.show_message("Livello %d\nRaggiungi l'uscita!" % level)
+		hud.show_message(message, 2.0 + defs.size())
 
 	for modifier in _modifiers:
 		modifier.level_started()
 	player.active = true
 
 
-# Sceglie a caso la variante del livello, tenendo conto del "peso" di ognuna
-# ed evitando di ripetere quella appena usata. null = nessuna variante.
-func _pick_modifier_def() -> ModifierDef:
+# Sceglie le varianti del livello: quante dipende dal livello, quali è un po'
+# a caso (tenendo conto del "peso"), senza ripetere quelle del livello appena
+# giocato e senza mettere insieme varianti incompatibili.
+func _pick_modifier_defs() -> Array[ModifierDef]:
+	var picked: Array[ModifierDef] = []
 	if forced_modifier:
-		return forced_modifier
+		picked.append(forced_modifier)
+		return picked
 	if level < first_modifier_level:
-		return null
+		return picked
 
-	var candidates: Array[ModifierDef] = []
-	for modifier_def in modifier_defs:
-		if modifier_def.min_level <= level and modifier_def.weight > 0.0 and modifier_def != _last_modifier_def:
-			candidates.append(modifier_def)
-	# Se l'unica possibile era proprio l'ultima, la si ripete.
-	if candidates.is_empty() and _last_modifier_def and _last_modifier_def.min_level <= level:
-		candidates.append(_last_modifier_def)
-	if candidates.is_empty():
-		return null
+	var count := 1
+	if level >= triple_modifier_level and rng.randf() < 0.4:
+		count = 3
+	elif level >= double_modifier_level and rng.randf() < 0.6:
+		count = 2
 
-	# Estrazione "pesata": immagina i pesi come segmenti messi in fila e un
-	# punto scelto a caso sulla fila; vince il segmento su cui cade.
+	for i in count:
+		var candidates: Array[ModifierDef] = []
+		for modifier_def in modifier_defs:
+			if modifier_def.min_level > level or modifier_def.weight <= 0.0:
+				continue
+			if _last_defs.has(modifier_def):
+				continue
+			var fits := true
+			for other in picked:
+				if not modifier_def.is_compatible_with(other):
+					fits = false
+			if fits:
+				candidates.append(modifier_def)
+		if candidates.is_empty():
+			break
+		picked.append(_weighted_choice(candidates))
+	return picked
+
+
+# Estrazione "pesata": immagina i pesi come segmenti messi in fila e un punto
+# scelto a caso sulla fila; vince il segmento su cui cade il punto.
+func _weighted_choice(candidates: Array[ModifierDef]) -> ModifierDef:
 	var total_weight := 0.0
 	for modifier_def in candidates:
 		total_weight += modifier_def.weight
@@ -147,10 +244,17 @@ func _pick_modifier_def() -> ModifierDef:
 	for modifier_def in candidates:
 		point -= modifier_def.weight
 		if point <= 0.0:
-			_last_modifier_def = modifier_def
 			return modifier_def
-	_last_modifier_def = candidates.back()
-	return _last_modifier_def
+	return candidates.back()
+
+
+# Mescola un array usando il generatore del gioco (algoritmo di Fisher-Yates).
+func shuffle(array: Array) -> void:
+	for i in range(array.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var temp: Variant = array[i]
+		array[i] = array[j]
+		array[j] = temp
 
 
 # Crea la scena della variante e la aggiunge sotto il nodo Modifiers.
@@ -179,8 +283,16 @@ func _remove_modifiers() -> void:
 func _on_player_reached_cell(cell: Vector2i) -> void:
 	for modifier in _modifiers:
 		modifier.player_stepped(cell)
-	if _timer_running and cell == maze.exit_cell:
+	if _timer_running and player.cell == maze.exit_cell and _exit_allowed():
 		_complete_level()
+
+
+# true se nessuna variante impedisce di uscire (es. stelle ancora da prendere).
+func _exit_allowed() -> bool:
+	for modifier in _modifiers:
+		if not modifier.allows_exit():
+			return false
+	return true
 
 
 func _complete_level() -> void:

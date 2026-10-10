@@ -35,6 +35,8 @@ var _height := 0
 # Generatore di numeri casuali dedicato: impostando rng.seed si può ottenere
 # sempre lo stesso labirinto (utile per fare prove).
 var _rng := RandomNumberGenerator.new()
+# Colore del pavimento scelto nell'Inspector (le varianti possono cambiarlo).
+@onready var _default_floor_color := floor_color
 
 
 # Crea un nuovo labirinto di `cols` x `rows` stanze e lo ridisegna.
@@ -48,6 +50,7 @@ func generate(cols: int, rows: int) -> void:
 	start_cell = Vector2i(1, 1)
 	exit_cell = Vector2i(_width - 2, _height - 2)
 
+	floor_color = _default_floor_color
 	walls_opacity = 1.0  # Assegnarla chiama anche queue_redraw().
 
 
@@ -56,6 +59,32 @@ func is_walkable(cell: Vector2i) -> bool:
 	if cell.x < 0 or cell.y < 0 or cell.x >= _width or cell.y >= _height:
 		return false
 	return not _grid[cell.y][cell.x]
+
+
+# Le "stanze" libere: le caselle con coordinate entrambe dispari, cioè quelle
+# dove si incrociano i corridoi (le altre sono i passaggi tra due stanze).
+func get_rooms() -> Array[Vector2i]:
+	var rooms: Array[Vector2i] = []
+	for y in range(1, _height, 2):
+		for x in range(1, _width, 2):
+			if not _grid[y][x]:
+				rooms.append(Vector2i(x, y))
+	return rooms
+
+
+# Quante caselle libere confinano con questa (1 = vicolo cieco, 3+ = incrocio).
+func count_exits(cell: Vector2i) -> int:
+	var exits := 0
+	for dir in MazeGenerator.DIRECTIONS:
+		if is_walkable(cell + dir):
+			exits += 1
+	return exits
+
+
+# Apre alcuni muri in più (vedi MazeGenerator.add_loops).
+func add_loops(rng: RandomNumberGenerator, count: int) -> void:
+	MazeGenerator.add_loops(_grid, rng, count)
+	queue_redraw()
 
 
 # Percorso più breve tra due caselle libere (vedi MazeGenerator.find_path).

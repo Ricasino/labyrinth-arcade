@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ModifierDef" format=3]
+
+[ext_resource type="Script" path="res://modifiers/modifier_def.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://modifiers/portals/portals.tscn" id="2_scene"]
+
+[resource]
+script = ExtResource("1_def")
+title = "Portali"
+description = "Entra in un portale ed esci da quello dello stesso colore."
+scene = ExtResource("2_scene")
+min_level = 2
+weight = 1.0
+tags = PackedStringArray("portali")

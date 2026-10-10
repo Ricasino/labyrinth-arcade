@@ -9,10 +9,19 @@
 [ext_resource type="Script" path="res://modifiers/modifier_def.gd" id="7_def"]
 [ext_resource type="Resource" path="res://modifiers/memory/memory.tres" id="8_memory"]
 [ext_resource type="Resource" path="res://modifiers/living_maze/living_maze.tres" id="9_living"]
+[ext_resource type="Resource" path="res://modifiers/stars/stars.tres" id="10_stars"]
+[ext_resource type="Resource" path="res://modifiers/keys/keys.tres" id="11_keys"]
+[ext_resource type="Resource" path="res://modifiers/portals/portals.tres" id="12_portals"]
+[ext_resource type="Resource" path="res://modifiers/mirror/mirror.tres" id="13_mirror"]
+[ext_resource type="Resource" path="res://modifiers/ice/ice.tres" id="14_ice"]
+[ext_resource type="Resource" path="res://modifiers/rhythm/rhythm.tres" id="15_rhythm"]
+[ext_resource type="Resource" path="res://modifiers/patrol/patrol.tres" id="16_patrol"]
+[ext_resource type="Resource" path="res://modifiers/chaser/chaser.tres" id="17_chaser"]
+[ext_resource type="Resource" path="res://modifiers/ghost/ghost.tres" id="18_ghost"]
 
 [node name="Main" type="Node2D" unique_id=1719102481]
 script = ExtResource("1_main")
-modifier_defs = Array[ExtResource("7_def")]([ExtResource("8_memory"), ExtResource("9_living")])
+modifier_defs = Array[ExtResource("7_def")]([ExtResource("8_memory"), ExtResource("9_living"), ExtResource("10_stars"), ExtResource("11_keys"), ExtResource("12_portals"), ExtResource("13_mirror"), ExtResource("14_ice"), ExtResource("15_rhythm"), ExtResource("16_patrol"), ExtResource("17_chaser"), ExtResource("18_ghost")])
 
 [node name="Maze" type="Node2D" parent="." unique_id=1198721265]
 script = ExtResource("2_maze")

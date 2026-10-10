@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ModifierDef" format=3]
+
+[ext_resource type="Script" path="res://modifiers/modifier_def.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://modifiers/keys/keys.tscn" id="2_scene"]
+
+[resource]
+script = ExtResource("1_def")
+title = "Chiavi e porte"
+description = "Una porta sbarra la strada: trova la chiave del suo colore."
+scene = ExtResource("2_scene")
+min_level = 3
+weight = 1.0
+tags = PackedStringArray("passaggi")

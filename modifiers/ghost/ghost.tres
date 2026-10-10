@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ModifierDef" format=3]
+
+[ext_resource type="Script" path="res://modifiers/modifier_def.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://modifiers/ghost/ghost.tscn" id="2_scene"]
+
+[resource]
+script = ExtResource("1_def")
+title = "Il tuo fantasma"
+description = "Un fantasma rifà la tua strada: non fermarti e non tornare indietro!"
+scene = ExtResource("2_scene")
+min_level = 4
+weight = 0.9
+tags = PackedStringArray("nemici")

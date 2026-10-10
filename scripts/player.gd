@@ -37,7 +37,16 @@ var active := false
 # can_enter(), che oltre ai muri controlla anche le varianti (porte, ecc.).
 # Se nessuno la imposta, valgono solo i muri del labirinto.
 var can_enter: Callable
+# Effetti che le varianti possono attivare (Game li azzera a ogni livello con
+# reset_effects()).
+# Comandi invertiti: destra va a sinistra, su va giù ("Specchio").
+var invert_controls := false
+# Pavimento scivoloso: una volta partito, il giocatore si ferma solo contro un
+# muro o a un incrocio ("Ghiaccio").
+var slippery := false
 
+var _default_speed := 0.0
+var _slide_direction := Vector2i.ZERO
 var _moving := false
 var _target_position := Vector2.ZERO
 # Ultima azione di movimento premuta: ha la precedenza sulle altre.
@@ -48,13 +57,26 @@ var _last_action := &""
 var _queued_direction := Vector2i.ZERO
 
 
-# Teletrasporta il giocatore su una casella (usato a inizio livello).
+func _ready() -> void:
+	_default_speed = speed
+
+
+# Teletrasporta il giocatore su una casella (inizio livello, portali, "preso!").
 func place_at(new_cell: Vector2i) -> void:
 	cell = new_cell
 	position = maze.cell_to_position(cell)
 	_moving = false
 	_queued_direction = Vector2i.ZERO
+	_slide_direction = Vector2i.ZERO
 	queue_redraw()
+
+
+# Toglie gli effetti delle varianti del livello precedente.
+func reset_effects() -> void:
+	speed = _default_speed
+	invert_controls = false
+	slippery = false
+	_slide_direction = Vector2i.ZERO
 
 
 # _unhandled_input riceve gli eventi di input che nessun altro nodo (ad
@@ -86,6 +108,8 @@ func _process(delta: float) -> void:
 			cell += direction
 			_target_position = maze.cell_to_position(cell)
 			_moving = true
+			if slippery:
+				_slide_direction = direction
 
 
 # Sceglie in che direzione andare, in ordine di priorità:
@@ -95,6 +119,16 @@ func _process(delta: float) -> void:
 # Viene scelta la prima che porta in una casella libera. Così, tenendo premuti
 # due tasti (es. destra + su), il giocatore svolta appena trova un'apertura.
 func _pick_direction() -> Vector2i:
+	if not can_enter.is_valid():
+		can_enter = maze.is_walkable
+
+	# Sul ghiaccio si continua dritti finché si può, fermandosi solo agli
+	# incroci (dove si può scegliere dove andare) o contro un muro.
+	if _slide_direction != Vector2i.ZERO:
+		if can_enter.call(cell + _slide_direction) and not _is_junction(cell):
+			return _slide_direction
+		_slide_direction = Vector2i.ZERO
+
 	var candidates: Array[Vector2i] = []
 	if _queued_direction != Vector2i.ZERO:
 		candidates.append(_queued_direction)
@@ -105,12 +139,21 @@ func _pick_direction() -> Vector2i:
 			candidates.append(ACTION_DIRECTIONS[action])
 	_queued_direction = Vector2i.ZERO
 
-	if not can_enter.is_valid():
-		can_enter = maze.is_walkable
 	for direction in candidates:
+		if invert_controls:
+			direction = -direction
 		if can_enter.call(cell + direction):
 			return direction
 	return Vector2i.ZERO
+
+
+# true se dalla casella partono almeno tre strade.
+func _is_junction(from_cell: Vector2i) -> bool:
+	var exits := 0
+	for direction: Vector2i in ACTION_DIRECTIONS.values():
+		if maze.is_walkable(from_cell + direction):
+			exits += 1
+	return exits >= 3
 
 
 func _draw() -> void:

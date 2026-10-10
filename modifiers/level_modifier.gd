@@ -13,7 +13,8 @@ class_name LevelModifier
 extends Node2D
 
 # Il gioco. Da qui la variante raggiunge tutto il resto: game.maze,
-# game.player, game.hud, game.exit_marker, game.rng, game.level...
+# game.player, game.hud, game.exit_marker, game.rng, game.level, e funzioni
+# utili come game.pick_rooms() e game.catch_player().
 var game: Game
 
 
@@ -32,3 +33,21 @@ func player_stepped(_cell: Vector2i) -> void:
 # non è un muro (per esempio una porta chiusa).
 func blocks_cell(_cell: Vector2i) -> bool:
 	return false
+
+
+# Se restituisce false, arrivare sull'uscita non fa finire il livello (per
+# esempio finché mancano stelle da raccogliere).
+func allows_exit() -> bool:
+	return true
+
+
+# Chiamata quando un nemico ha preso il giocatore e lo ha rimandato alla
+# partenza: per esempio i nemici tornano al loro posto.
+func player_caught() -> void:
+	pass
+
+
+# Testo da mostrare sotto il titolo nell'HUD, per esempio "Stelle 2/5".
+# "" = niente da mostrare.
+func status_text() -> String:
+	return ""

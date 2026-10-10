@@ -147,6 +147,22 @@ static func shift_wall(grid: Array, rng: RandomNumberGenerator, can_change: Call
 	return false
 
 
+# Apre `count` muri a caso tra due stanze vicine. Ogni muro aperto crea un
+# anello: il labirinto non è più "perfetto" e tra due punti possono esserci
+# più strade. Serve per poter scappare ai nemici girandoci attorno.
+static func add_loops(grid: Array, rng: RandomNumberGenerator, count: int) -> void:
+	var height := grid.size()
+	var width := (grid[0] as Array).size()
+	var opened := 0
+	for attempt in count * 20:
+		if opened >= count:
+			return
+		var wall := Vector2i(rng.randi_range(1, width - 2), rng.randi_range(1, height - 2))
+		if wall.x % 2 != wall.y % 2 and grid[wall.y][wall.x]:
+			_open(grid, wall)
+			opened += 1
+
+
 # Converte le coordinate di una stanza in quelle della casella corrispondente.
 static func _room_to_cell(room: Vector2i) -> Vector2i:
 	return room * 2 + Vector2i.ONE
