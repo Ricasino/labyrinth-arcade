@@ -7,6 +7,9 @@
 # - conta il tempo e aggiorna l'HUD;
 # - quando il giocatore raggiunge l'uscita, passa al livello successivo.
 #
+# Come si comporta dipende dalla modalità scelta nel menu, che legge
+# dall'Autoload GameSettings (scripts/game_settings.gd).
+#
 # Con `class_name Game` le varianti possono scrivere `var game: Game` e usare
 # le variabili e le funzioni pubbliche qui sotto (maze, player, hud, ...).
 class_name Game
@@ -23,19 +26,21 @@ extends Node2D
 @export var camera_margin := 64
 
 @export_group("Varianti")
-# Le varianti che il gioco può pescare. Per aggiungerne una nuova: crea la sua
-# cartella in modifiers/ (scena, script e scheda .tres), poi trascina la
-# scheda in questa lista dall'Inspector del nodo Main.
-@export var modifier_defs: Array[ModifierDef] = []
+# L'elenco delle varianti che il gioco può pescare (modifiers/catalog.tres).
+@export var catalog: ModifierCatalog
 # Da questo livello in poi ogni labirinto ha almeno una variante...
 @export var first_modifier_level := 2
 # ...da questo livello spesso due insieme...
 @export var double_modifier_level := 5
 # ...e da questo a volte tre.
 @export var triple_modifier_level := 9
-# Per provare una variante: se la imposti qui, esce a ogni livello (anche al
-# primo) al posto della scelta casuale. Lasciala vuota per giocare normalmente.
+# Per provare una variante dall'editor: se la imposti qui, esce a ogni
+# livello in qualunque modalità. Lasciala vuota per giocare normalmente.
 @export var forced_modifier: ModifierDef
+
+@export_group("Sfida del giorno")
+# Quanti livelli dura la sfida del giorno.
+@export var daily_levels := 5
 
 @export_group("Nemici")
 # Secondi aggiunti al tempo quando un nemico ti prende.
@@ -68,12 +73,20 @@ var _last_defs: Array[ModifierDef] = []
 var _reserved_cells := {}
 # Momento (in secondi di gioco) in cui il giocatore potrà di nuovo essere preso.
 var _catchable_after := 0.0
+# Modalità Caos: più regole subito, anche quelle dei livelli alti.
+var _chaos := false
+# Sfida del giorno: tempo totale dei livelli già finiti.
+var _daily := false
+var _daily_total := 0.0
 
 
 # _ready viene chiamata una volta, quando il nodo e tutti i suoi figli sono
 # entrati nella scena. È il posto giusto per collegare i segnali e iniziare.
 func _ready() -> void:
 	rng.randomize()
+	_apply_mode()
+	# Il pulsante "Menu" dell'HUD emette questo segnale.
+	hud.menu_requested.connect(go_to_menu)
 	# Il giocatore chiederà a questa funzione se può entrare in una casella.
 	player.can_enter = can_enter
 	# Collega il segnale del giocatore a una funzione di questo script.
@@ -91,11 +104,39 @@ func _process(delta: float) -> void:
 
 	# Le varianti possono mostrare una riga di stato (es. "Stelle 2/5").
 	var texts: PackedStringArray = []
+	if _daily:
+		texts.append("Sfida del giorno %d/%d" % [level, daily_levels])
 	for modifier in _modifiers:
 		var text := modifier.status_text()
 		if text != "":
 			texts.append(text)
 	hud.set_info("     ".join(texts))
+
+
+# Esc (o il tasto "indietro") riporta al menu.
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		go_to_menu()
+
+
+# Torna al menu: cambia scena. La scena del gioco viene eliminata da Godot.
+func go_to_menu() -> void:
+	get_tree().change_scene_to_file("res://scenes/menu.tscn")
+
+
+# Legge la modalità scelta nel menu e regola il gioco di conseguenza.
+func _apply_mode() -> void:
+	match GameSettings.mode:
+		GameSettings.Mode.CLASSIC:
+			first_modifier_level = 1000  # Cioè: mai.
+		GameSettings.Mode.CHAOS:
+			_chaos = true
+		GameSettings.Mode.SINGLE:
+			if forced_modifier == null:
+				forced_modifier = GameSettings.single_modifier
+		GameSettings.Mode.DAILY:
+			_daily = true
+			double_modifier_level = 4
 
 
 # true se il giocatore può entrare nella casella: non deve essere un muro e
@@ -155,9 +196,14 @@ func _start_level(new_level: int) -> void:
 	level = new_level
 	_remove_modifiers()
 
+	# Nella sfida del giorno il "seme" dei numeri casuali dipende dalla data e
+	# dal livello: oggi tutti giocano gli stessi labirinti con le stesse regole.
+	if _daily:
+		rng.seed = hash("%s-%d" % [GameSettings.today(), level])
+
 	var cols := first_cols + (level - 1) * cols_per_level
 	var rows := first_rows + (level - 1) * rows_per_level
-	maze.generate(cols, rows)
+	maze.generate(cols, rows, rng)
 
 	exit_marker.position = maze.cell_to_position(maze.exit_cell)
 	exit_marker.size = maze.tile_size
@@ -206,19 +252,24 @@ func _pick_modifier_defs() -> Array[ModifierDef]:
 	if forced_modifier:
 		picked.append(forced_modifier)
 		return picked
-	if level < first_modifier_level:
+	if level < first_modifier_level and not _chaos:
 		return picked
 
 	var count := 1
-	if level >= triple_modifier_level and rng.randf() < 0.4:
+	if _chaos:
+		count = 3 if level >= 3 and rng.randf() < 0.5 else 2
+	elif level >= triple_modifier_level and rng.randf() < 0.4:
 		count = 3
 	elif level >= double_modifier_level and rng.randf() < 0.6:
 		count = 2
 
 	for i in count:
 		var candidates: Array[ModifierDef] = []
-		for modifier_def in modifier_defs:
-			if modifier_def.min_level > level or modifier_def.weight <= 0.0:
+		for modifier_def in catalog.modifiers:
+			if modifier_def.weight <= 0.0:
+				continue
+			# Nel Caos escono anche le regole pensate per i livelli alti.
+			if modifier_def.min_level > level and not _chaos:
 				continue
 			if _last_defs.has(modifier_def):
 				continue
@@ -298,11 +349,38 @@ func _exit_allowed() -> bool:
 func _complete_level() -> void:
 	_timer_running = false
 	player.active = false
+	if _daily:
+		_daily_total += _elapsed
+		if level >= daily_levels:
+			_finish_daily()
+			return
 	hud.show_message("Uscita trovata!\nTempo: %s" % Hud.format_time(_elapsed), level_transition_time)
-	# `await` sospende questa funzione finché il timer non scade, senza
+	# `await` sospende questa funzione finché l'attesa non finisce, senza
 	# bloccare il gioco: nel frattempo Godot continua a disegnare e animare.
-	await get_tree().create_timer(level_transition_time).timeout
+	await _wait(level_transition_time)
 	_start_level(level + 1)
+
+
+# Fine della sfida del giorno: mostra il tempo totale, salva il record e
+# torna al menu.
+func _finish_daily() -> void:
+	var text := "Sfida del giorno completata!\nTempo totale: %s" % Hud.format_time(_daily_total)
+	if GameSettings.save_daily_time(_daily_total):
+		text += "\nNuovo record!"
+	else:
+		text += "\nRecord di oggi: %s" % Hud.format_time(GameSettings.get_daily_record())
+	hud.show_message(text, 4.0)
+	await _wait(4.5)
+	go_to_menu()
+
+
+# Aspetta `seconds` secondi. Usa un Tween "legato" a questo nodo: se nel
+# frattempo torni al menu e il gioco viene eliminato, l'attesa si annulla da
+# sola invece di continuare su un nodo che non esiste più.
+func _wait(seconds: float) -> void:
+	var tween := create_tween()
+	tween.tween_interval(seconds)
+	await tween.finished
 
 
 # I limiti impediscono alla telecamera di mostrare il vuoto oltre il

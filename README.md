@@ -4,6 +4,8 @@ Gioco arcade a labirinto in **Godot 4.7** (GDScript, 2D).
 
 Raggiungi l'uscita verde il più in fretta possibile: ogni volta che ci arrivi
 parte un nuovo labirinto, generato a caso e un po' più grande del precedente.
+Undici regole speciali (buio, nemici, portali, ghiaccio...) rendono ogni
+livello diverso, e dal menu iniziale scegli come giocare.
 
 Questo README spiega anche **come è organizzato il progetto** e quali concetti
 di Godot usa, file per file, così puoi studiarlo.
@@ -16,7 +18,8 @@ di Godot usa, file per file, così puoi studiarlo.
    <https://godotengine.org/download>.
 2. Apri Godot. Nel **Project Manager** clicca **Importa** e scegli il file
    `project.godot` nella root di questa repo.
-3. Premi **F5** (oppure il pulsante ▶ in alto a destra) per avviare il gioco.
+3. Premi **F5** (oppure il pulsante ▶ in alto a destra) per avviare il gioco:
+   parte dal menu.
 
 Al primo avvio Godot crea la cartella nascosta `.godot/` (cache, ignorata da
 git) e importa le risorse: è normale.
@@ -36,6 +39,19 @@ anche senza telefono.
 
 Suggerimento: tenendo premute due direzioni (es. destra + su) il giocatore
 svolta automaticamente alla prima apertura.
+
+Per tornare al menu durante la partita: pulsante **Menu** in alto a sinistra,
+oppure tasto **Esc**.
+
+### Modalità (dal menu)
+
+| Modalità | Come funziona |
+|---|---|
+| **Arcade** | Livello 1 normale, poi una regola a sorpresa a ogni livello; dal livello 5 spesso due insieme, dal 9 a volte tre. |
+| **Classico** | Solo il labirinto, senza regole speciali. |
+| **Caos** | Due o tre regole insieme fin dal primo livello. |
+| **Sfida del giorno** | 5 livelli che oggi sono uguali per tutti (stessi labirinti, stesse regole). Alla fine vedi il tempo totale e il tuo record di oggi. |
+| **Allenamento** | Un pulsante per ogni regola: la giochi da sola, a ogni livello. |
 
 ---
 
@@ -85,13 +101,17 @@ labyrinth-arcade/
 │   └── pubblica-web.yml       Automazione: pubblica il gioco online a ogni Push
 ├── icon.svg                   Icona del gioco
 ├── scenes/                    Le scene (.tscn): "come sono fatti" gli oggetti
-│   ├── main.tscn              Scena principale: mette insieme tutte le altre
+│   ├── menu.tscn              Il menu iniziale (è la prima scena che parte)
+│   ├── ui_theme.tres          Il tema: l'aspetto dei pulsanti
+│   ├── main.tscn              La scena del gioco: mette insieme tutte le altre
 │   ├── player.tscn            Il giocatore (con la telecamera)
 │   ├── exit.tscn              Il segnalino dell'uscita
 │   ├── hud.tscn               Le scritte a schermo (livello, timer, messaggi)
 │   └── touch_controls.tscn    La croce direzionale per il touch
 ├── scripts/                   Gli script GDScript (.gd): "cosa fanno" gli oggetti
-│   ├── main.gd                Regista del gioco: livelli, timer, telecamera
+│   ├── game_settings.gd       Autoload: modalità scelta e record
+│   ├── menu.gd                Il menu: crea i pulsanti e avvia il gioco
+│   ├── main.gd                Regista del gioco: livelli, varianti, timer
 │   ├── maze_generator.gd      Algoritmo che genera il labirinto (solo dati)
 │   ├── maze.gd                Contiene il labirinto e lo disegna
 │   ├── player.gd              Movimento del giocatore sulla griglia
@@ -101,8 +121,10 @@ labyrinth-arcade/
 ├── modifiers/                 Le varianti: regole speciali, una per cartella
 │   ├── level_modifier.gd      Base comune di tutte le varianti
 │   ├── modifier_def.gd        La "scheda" di una variante (titolo, livello minimo...)
-│   ├── memory/                "A memoria": scena, script e scheda .tres
-│   └── living_maze/           "Labirinto vivo": scena, script e scheda .tres
+│   ├── modifier_catalog.gd    Il tipo del catalogo
+│   ├── catalog.tres           Il catalogo: l'elenco di tutte le varianti
+│   ├── common/enemy.gd        Il nemico che cammina sulla griglia (usato da più varianti)
+│   └── memory/, keys/, ...    Una cartella per variante: scena, script e scheda .tres
 └── tests/
     └── test_maze_generator.gd Test automatico del generatore
 ```
@@ -192,30 +214,46 @@ Godot chiama automaticamente alcune funzioni "virtuali" (iniziano con `_`):
   (`exit.gd`) e la dissolvenza dei messaggi (`hud.gd`).
 - **`await`** – mette in pausa una funzione senza bloccare il gioco: in
   `main.gd` aspettiamo 1,5 secondi prima del livello successivo.
+- **Autoload** (*Progetto → Impostazioni progetto → Globali*) – un nodo che
+  Godot crea all'avvio e che sopravvive ai cambi di scena. `GameSettings`
+  porta la modalità scelta dal menu al gioco e salva i record nella cartella
+  `user://`.
+- **Cambiare scena** – `get_tree().change_scene_to_file(...)` sostituisce la
+  scena attuale con un'altra (menu → gioco e ritorno).
+- **Tema** (`scenes/ui_theme.tres`) – l'aspetto dei pulsanti (colori, bordi,
+  angoli arrotondati) definito una volta sola e usato dal menu e dall'HUD.
+- **Risorse personalizzate** – `ModifierDef` e `ModifierCatalog` sono "schede"
+  di soli dati, salvate come file `.tres` e modificabili nell'Inspector.
 
 ---
 
 ## Cosa succede quando premi Play
 
-1. Godot legge `project.godot` e carica la scena indicata in
-   `run/main_scene`, cioè `scenes/main.tscn`.
-2. Tutti i nodi entrano nell'albero e ricevono `_ready()`: **prima i figli,
-   poi il padre**. Quindi quando arriva `Main._ready()` labirinto,
+1. Godot legge `project.godot`. Prima crea gli **Autoload** (qui
+   `GameSettings`), poi carica la scena indicata in `run/main_scene`, cioè
+   `scenes/menu.tscn`.
+2. Il menu (`scripts/menu.gd`) crea un pulsante per ogni variante del
+   catalogo. Quando scegli una modalità la scrive in `GameSettings.mode` e
+   cambia scena con `get_tree().change_scene_to_file("res://scenes/main.tscn")`:
+   il menu viene eliminato e parte il gioco.
+3. Tutti i nodi del gioco entrano nell'albero e ricevono `_ready()`: **prima i
+   figli, poi il padre**. Quindi quando arriva `Main._ready()` labirinto,
    giocatore e HUD sono già pronti.
-3. `Main._ready()` collega i segnali e chiama `_start_level(1)`, che:
+4. `Main._ready()` legge la modalità da `GameSettings`, collega i segnali e
+   chiama `_start_level(1)`, che:
    - chiede a `Maze` di generare un labirinto (`maze.generate`), il quale usa
      `MazeGenerator` e poi si ridisegna;
    - mette l'uscita e il giocatore nelle loro caselle;
    - aggiorna i limiti della telecamera e azzera il timer;
    - dal livello 2 pesca una variante, la aggiunge sotto `Modifiers` e
      mostra il suo nome (vedi "Le varianti" più sotto).
-4. A ogni fotogramma:
+5. A ogni fotogramma:
    - `Main._process` aggiunge `delta` al tempo e aggiorna l'HUD;
    - `Player._process` fa avanzare il giocatore verso la casella successiva e,
      quando ci arriva, emette `reached_cell` e sceglie il passo seguente in
      base ai tasti premuti. Prima di ogni passo chiede a `Main.can_enter()`
      se la casella è libera.
-5. Quando la casella raggiunta è l'uscita, `Main._complete_level()` ferma il
+6. Quando la casella raggiunta è l'uscita, `Main._complete_level()` ferma il
    timer, blocca il giocatore, mostra il tempo, aspetta un attimo e chiama
    `_start_level` con il livello successivo (più grande).
 
@@ -264,14 +302,27 @@ più una linea "neon" sui lati che toccano il pavimento.
 
 ## Le varianti
 
-Per rendere ogni partita diversa, dal livello 2 ogni labirinto ha una
-**variante**: una regola speciale pescata a caso, mai la stessa due volte di
-fila. Il suo nome compare in alto al centro.
+Le **varianti** sono le regole speciali dei livelli. In modalità Arcade sono
+pescate a caso, mai le stesse del livello appena giocato, e due varianti che
+non vanno d'accordo (per esempio due tipi di nemici) non escono mai insieme.
+Il loro nome compare in alto al centro; sotto, una riga di stato come
+"Stelle 2/5".
 
-| Variante | Cosa succede | Cosa insegna di Godot |
+| Variante (cartella in `modifiers/`) | Cosa succede | Cosa insegna di Godot |
 |---|---|---|
-| **A memoria** (`modifiers/memory/`) | Il labirinto si vede per 3 secondi, poi i muri spariscono. | Animare una proprietà con un `Tween` |
-| **Labirinto vivo** (`modifiers/living_maze/`) | È buio: si vede solo attorno al giocatore, e fuori dalla luce i muri si spostano. | Luci 2D (`CanvasModulate`, `PointLight2D`), `Timer`, segnali collegati nell'editor |
+| **A memoria** (`memory`) | Il labirinto si vede per 3 secondi, poi i muri spariscono. | Animare una proprietà con un `Tween` |
+| **Labirinto vivo** (`living_maze`) | È buio: si vede solo attorno a te, e fuori dalla luce i muri si spostano. | Luci 2D (`CanvasModulate`, `PointLight2D`), `Timer`, segnali collegati nell'editor |
+| **Caccia alle stelle** (`stars`) | L'uscita vale solo dopo aver raccolto tutte le stelle. | Disegnare poligoni con `_draw()` |
+| **Chiavi e porte** (`keys`) | Porte colorate sulla strada: serve la chiave dello stesso colore. | Visita in ampiezza per mettere le chiavi dove si possono raggiungere |
+| **Portali** (`portals`) | Entri in un portale ed esci da quello dello stesso colore. | Spostare il giocatore da codice |
+| **Specchio** (`mirror`) | Comandi invertiti. | Effetti sul giocatore che il gioco azzera a ogni livello |
+| **Ghiaccio** (`ice`) | Scivoli finché non trovi un muro o un incrocio. | Cambiare un colore del labirinto a runtime |
+| **A ritmo** (`rhythm`) | Cancelli che si aprono e chiudono a tempo di metronomo. | Creare un suono da codice (`AudioStreamWAV`, `AudioStreamPlayer`) |
+| **Ronda** (`patrol`) | Guardie che vanno avanti e indietro in corridoi laterali. | Nemici creati da codice (`Enemy.new()`), funzioni salvate in variabili (lambda) |
+| **Inseguitore** (`chaser`) | Un mostro più lento di te ti insegue quando ti sente. | Ricalcolare il percorso più breve a ogni passo |
+| **Il tuo fantasma** (`ghost`) | Un fantasma rifà la tua strada qualche secondo dopo. | Registrare e "riprodurre" posizioni nel tempo |
+
+Se un nemico ti tocca torni alla partenza e il tempo aumenta di 3 secondi.
 
 ### Come è fatta una variante
 
@@ -284,12 +335,17 @@ Ogni variante è una cartella dentro `modifiers/` con tre file:
   - `player_stepped(cell)`: il giocatore è arrivato in una casella;
   - `blocks_cell(cell)`: risponde `true` per impedire al giocatore di
     entrare in una casella (porte, trappole...);
+  - `allows_exit()`: risponde `false` se l'uscita non deve ancora valere;
+  - `player_caught()`: un nemico ti ha preso e sei tornato alla partenza;
+  - `status_text()`: il testo della riga di stato nell'HUD;
 - **la scheda** (`.tres`, una risorsa `ModifierDef`), con titolo,
-  descrizione, livello minimo e "peso" (quanto spesso esce).
+  descrizione, livello minimo, "peso" (quanto spesso esce) ed etichette
+  (`tags`: due varianti con un'etichetta in comune non escono insieme).
 
 Dallo script la variante raggiunge tutto il gioco tramite `game`:
 `game.maze`, `game.player`, `game.hud`, `game.exit_marker`, `game.rng`,
-`game.level`. `Main` la crea a inizio livello e la elimina alla fine, quindi
+`game.level`, e funzioni utili come `game.pick_rooms()` (stanze libere dove
+mettere oggetti) e `game.catch_player()` (il giocatore è stato preso). `Main` la crea a inizio livello e la elimina alla fine, quindi
 tutto quello che la variante crea sparisce con lei.
 
 ### Creare una nuova variante (passo passo)
@@ -310,10 +366,10 @@ tutto quello che la variante crea sparisce con lei.
 4. Clic destro sulla cartella → **Crea nuovo → Risorsa…** → **ModifierDef**:
    salvala come `veloce.tres`, poi nell'Inspector compila titolo e
    descrizione e trascina `veloce.tscn` nel campo **Scene**.
-5. Seleziona il nodo **Main** in `scenes/main.tscn` e trascina `veloce.tres`
-   nella lista **Modifier Defs** dell'Inspector.
-6. Per provarla subito, trascinala anche nel campo **Forced Modifier**: uscirà
-   a ogni livello. Ricordati di svuotare il campo quando hai finito.
+5. Fai doppio clic su `modifiers/catalog.tres` (il catalogo di tutte le
+   varianti) e trascina `veloce.tres` nella lista **Modifiers**
+   dell'Inspector. Fatto: la variante esce in Arcade e ha il suo pulsante
+   nell'Allenamento del menu.
 
 ---
 

@@ -10,3 +10,4 @@ description = "Tra 3 secondi i muri spariscono!"
 scene = ExtResource("2_scene")
 min_level = 2
 weight = 1.0
+tags = PackedStringArray("vista")

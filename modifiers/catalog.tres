@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ModifierCatalog" format=3]
+
+[ext_resource type="Script" path="res://modifiers/modifier_catalog.gd" id="1_catalog"]
+[ext_resource type="Script" path="res://modifiers/modifier_def.gd" id="2_def"]
+[ext_resource type="Resource" path="res://modifiers/memory/memory.tres" id="3_memory"]
+[ext_resource type="Resource" path="res://modifiers/living_maze/living_maze.tres" id="4_living_maze"]
+[ext_resource type="Resource" path="res://modifiers/stars/stars.tres" id="5_stars"]
+[ext_resource type="Resource" path="res://modifiers/keys/keys.tres" id="6_keys"]
+[ext_resource type="Resource" path="res://modifiers/portals/portals.tres" id="7_portals"]
+[ext_resource type="Resource" path="res://modifiers/mirror/mirror.tres" id="8_mirror"]
+[ext_resource type="Resource" path="res://modifiers/ice/ice.tres" id="9_ice"]
+[ext_resource type="Resource" path="res://modifiers/rhythm/rhythm.tres" id="10_rhythm"]
+[ext_resource type="Resource" path="res://modifiers/patrol/patrol.tres" id="11_patrol"]
+[ext_resource type="Resource" path="res://modifiers/chaser/chaser.tres" id="12_chaser"]
+[ext_resource type="Resource" path="res://modifiers/ghost/ghost.tres" id="13_ghost"]
+
+[resource]
+script = ExtResource("1_catalog")
+modifiers = Array[ExtResource("2_def")]([ExtResource("3_memory"), ExtResource("4_living_maze"), ExtResource("5_stars"), ExtResource("6_keys"), ExtResource("7_portals"), ExtResource("8_mirror"), ExtResource("9_ice"), ExtResource("10_rhythm"), ExtResource("11_patrol"), ExtResource("12_chaser"), ExtResource("13_ghost")])

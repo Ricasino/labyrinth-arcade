@@ -32,17 +32,15 @@ var walls_opacity := 1.0:
 var _grid: Array = []
 var _width := 0
 var _height := 0
-# Generatore di numeri casuali dedicato: impostando rng.seed si può ottenere
-# sempre lo stesso labirinto (utile per fare prove).
-var _rng := RandomNumberGenerator.new()
 # Colore del pavimento scelto nell'Inspector (le varianti possono cambiarlo).
 @onready var _default_floor_color := floor_color
 
 
 # Crea un nuovo labirinto di `cols` x `rows` stanze e lo ridisegna.
-func generate(cols: int, rows: int) -> void:
-	_rng.randomize()
-	_grid = MazeGenerator.generate(cols, rows, _rng)
+# I numeri casuali arrivano da `rng`: con lo stesso "seme" (rng.seed) esce
+# sempre lo stesso labirinto. La sfida del giorno usa proprio questo trucco.
+func generate(cols: int, rows: int, rng: RandomNumberGenerator) -> void:
+	_grid = MazeGenerator.generate(cols, rows, rng)
 	_height = _grid.size()
 	_width = (_grid[0] as Array).size()
 

@@ -10,3 +10,4 @@ description = "Al buio i muri si spostano!"
 scene = ExtResource("2_scene")
 min_level = 2
 weight = 1.0
+tags = PackedStringArray("vista", "passaggi")

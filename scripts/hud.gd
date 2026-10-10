@@ -6,6 +6,10 @@
 class_name Hud
 extends CanvasLayer
 
+# Emesso quando si preme il pulsante "Menu". L'HUD non sa come si torna al
+# menu: lo annuncia e basta, e Game (che ascolta il segnale) fa il resto.
+signal menu_requested
+
 # Il simbolo % indica un "nodo con nome unico" nella scena (nell'editor:
 # clic destro sul nodo > "Accedi come nome unico"). Si trova anche se in
 # futuro lo sposti dentro un altro contenitore, a differenza di un percorso
@@ -20,6 +24,10 @@ extends CanvasLayer
 @onready var _message_label: Label = %MessageLabel
 
 var _message_tween: Tween
+
+
+func _ready() -> void:
+	%MenuButton.pressed.connect(menu_requested.emit)
 
 
 func set_level(level: int) -> void:

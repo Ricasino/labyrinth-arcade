@@ -12,9 +12,13 @@ config_version=5
 
 config/name="Labyrinth Arcade"
 config/description="Gioco arcade a labirinto: raggiungi l'uscita il più in fretta possibile."
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/menu.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
+
+[autoload]
+
+GameSettings="*res://scripts/game_settings.gd"
 
 [display]
 
