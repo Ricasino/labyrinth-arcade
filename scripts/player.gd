@@ -32,6 +32,11 @@ const ACTION_DIRECTIONS := {
 var cell := Vector2i.ZERO
 # Quando è false il giocatore ignora i comandi (es. durante il cambio livello).
 var active := false
+# La funzione che decide se il giocatore può entrare in una casella. È una
+# Callable, cioè una funzione salvata in una variabile: Game ci mette la sua
+# can_enter(), che oltre ai muri controlla anche le varianti (porte, ecc.).
+# Se nessuno la imposta, valgono solo i muri del labirinto.
+var can_enter: Callable
 
 var _moving := false
 var _target_position := Vector2.ZERO
@@ -100,8 +105,10 @@ func _pick_direction() -> Vector2i:
 			candidates.append(ACTION_DIRECTIONS[action])
 	_queued_direction = Vector2i.ZERO
 
+	if not can_enter.is_valid():
+		can_enter = maze.is_walkable
 	for direction in candidates:
-		if maze.is_walkable(cell + direction):
+		if can_enter.call(cell + direction):
 			return direction
 	return Vector2i.ZERO
 

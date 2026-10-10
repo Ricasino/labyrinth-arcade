@@ -98,6 +98,11 @@ labyrinth-arcade/
 │   ├── exit.gd                Disegno e animazione dell'uscita
 │   ├── hud.gd                 Aggiorna le scritte dell'HUD
 │   └── touch_dpad.gd          Croce direzionale virtuale per il touch
+├── modifiers/                 Le varianti: regole speciali, una per cartella
+│   ├── level_modifier.gd      Base comune di tutte le varianti
+│   ├── modifier_def.gd        La "scheda" di una variante (titolo, livello minimo...)
+│   ├── memory/                "A memoria": scena, script e scheda .tres
+│   └── living_maze/           "Labirinto vivo": scena, script e scheda .tres
 └── tests/
     └── test_maze_generator.gd Test automatico del generatore
 ```
@@ -129,11 +134,12 @@ sinistra) vedrai questo albero:
 Main (Node2D)                    scripts/main.gd
 ├── Maze (Node2D)                scripts/maze.gd
 ├── Exit (exit.tscn)             scripts/exit.gd
+├── Modifiers (Node2D)           qui Main aggiunge le varianti del livello
 ├── Player (player.tscn)         scripts/player.gd
 │   └── Camera2D                 segue il giocatore perché è sua figlia
 ├── HUD (hud.tscn)               scripts/hud.gd
 │   └── Root (Control)
-│       ├── TopBar → HBox → LevelLabel, TimeLabel
+│       ├── TopBar → HBox → LevelLabel, TwistLabel, TimeLabel
 │       └── MessageLabel
 └── TouchControls (touch_controls.tscn)
     └── DPad (Control)           scripts/touch_dpad.gd
@@ -200,12 +206,15 @@ Godot chiama automaticamente alcune funzioni "virtuali" (iniziano con `_`):
    - chiede a `Maze` di generare un labirinto (`maze.generate`), il quale usa
      `MazeGenerator` e poi si ridisegna;
    - mette l'uscita e il giocatore nelle loro caselle;
-   - aggiorna i limiti della telecamera, azzera il timer e mostra il messaggio.
+   - aggiorna i limiti della telecamera e azzera il timer;
+   - dal livello 2 pesca una variante, la aggiunge sotto `Modifiers` e
+     mostra il suo nome (vedi "Le varianti" più sotto).
 4. A ogni fotogramma:
    - `Main._process` aggiunge `delta` al tempo e aggiorna l'HUD;
    - `Player._process` fa avanzare il giocatore verso la casella successiva e,
      quando ci arriva, emette `reached_cell` e sceglie il passo seguente in
-     base ai tasti premuti.
+     base ai tasti premuti. Prima di ogni passo chiede a `Main.can_enter()`
+     se la casella è libera.
 5. Quando la casella raggiunta è l'uscita, `Main._complete_level()` ferma il
    timer, blocca il giocatore, mostra il tempo, aspetta un attimo e chiama
    `_start_level` con il livello successivo (più grande).
@@ -253,6 +262,61 @@ più una linea "neon" sui lati che toccano il pavimento.
 
 ---
 
+## Le varianti
+
+Per rendere ogni partita diversa, dal livello 2 ogni labirinto ha una
+**variante**: una regola speciale pescata a caso, mai la stessa due volte di
+fila. Il suo nome compare in alto al centro.
+
+| Variante | Cosa succede | Cosa insegna di Godot |
+|---|---|---|
+| **A memoria** (`modifiers/memory/`) | Il labirinto si vede per 3 secondi, poi i muri spariscono. | Animare una proprietà con un `Tween` |
+| **Labirinto vivo** (`modifiers/living_maze/`) | È buio: si vede solo attorno al giocatore, e fuori dalla luce i muri si spostano. | Luci 2D (`CanvasModulate`, `PointLight2D`), `Timer`, segnali collegati nell'editor |
+
+### Come è fatta una variante
+
+Ogni variante è una cartella dentro `modifiers/` con tre file:
+
+- **una scena** (`.tscn`), il cui nodo principale ha uno script che estende
+  `LevelModifier`. Può avere nodi figli: luci, timer, sprite...;
+- **lo script** (`.gd`), che ridefinisce solo le funzioni che gli servono:
+  - `level_started()`: il labirinto è pronto, la variante può iniziare;
+  - `player_stepped(cell)`: il giocatore è arrivato in una casella;
+  - `blocks_cell(cell)`: risponde `true` per impedire al giocatore di
+    entrare in una casella (porte, trappole...);
+- **la scheda** (`.tres`, una risorsa `ModifierDef`), con titolo,
+  descrizione, livello minimo e "peso" (quanto spesso esce).
+
+Dallo script la variante raggiunge tutto il gioco tramite `game`:
+`game.maze`, `game.player`, `game.hud`, `game.exit_marker`, `game.rng`,
+`game.level`. `Main` la crea a inizio livello e la elimina alla fine, quindi
+tutto quello che la variante crea sparisce con lei.
+
+### Creare una nuova variante (passo passo)
+
+1. Nel pannello **FileSystem** crea una cartella in `modifiers/`, per esempio
+   `modifiers/veloce/`.
+2. Crea una nuova scena con un nodo **Node2D** e salvala lì (`veloce.tscn`).
+3. Attacca al nodo un nuovo script (`veloce.gd`) e cambia la prima riga in
+   `extends LevelModifier`. Per esempio:
+   ```gdscript
+   extends LevelModifier
+
+   func level_started() -> void:
+   	game.player.speed = 14.0  # Il giocatore corre!
+   ```
+   (Attenzione: questa modifica resterebbe anche nei livelli dopo. Per
+   annullarla, ridefinisci `_exit_tree()` e rimetti la velocità di prima.)
+4. Clic destro sulla cartella → **Crea nuovo → Risorsa…** → **ModifierDef**:
+   salvala come `veloce.tres`, poi nell'Inspector compila titolo e
+   descrizione e trascina `veloce.tscn` nel campo **Scene**.
+5. Seleziona il nodo **Main** in `scenes/main.tscn` e trascina `veloce.tres`
+   nella lista **Modifier Defs** dell'Inspector.
+6. Per provarla subito, trascinala anche nel campo **Forced Modifier**: uscirà
+   a ogni livello. Ricordati di svuotare il campo quando hai finito.
+
+---
+
 ## Impostazioni del progetto
 
 Si trovano in *Progetto → Impostazioni progetto* (salvate in `project.godot`).
@@ -272,7 +336,8 @@ Quelle scelte per questo gioco:
 ## Test
 
 Il generatore ha un test che controlla bordi chiusi, raggiungibilità di
-tutte le caselle e assenza di anelli. Si lancia da terminale, senza finestra:
+tutte le caselle e assenza di anelli, anche dopo centinaia di spostamenti di
+muri (quelli del "Labirinto vivo"). Si lancia da terminale, senza finestra:
 
 ```
 godot --headless --path . -s tests/test_maze_generator.gd

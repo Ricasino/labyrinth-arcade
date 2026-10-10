@@ -79,6 +79,74 @@ static func generate(cols: int, rows: int, rng: RandomNumberGenerator) -> Array:
 	return grid
 
 
+# Trova il percorso più breve tra due caselle libere con una visita in
+# ampiezza (BFS): si esplora "a cerchi" a partire da `from`, ricordando da
+# dove si è arrivati in ogni casella, poi si ripercorre all'indietro da `to`.
+# Restituisce l'elenco delle caselle (estremi compresi), vuoto se `to` non è
+# raggiungibile.
+static func find_path(grid: Array, from: Vector2i, to: Vector2i) -> Array[Vector2i]:
+	var previous := {from: from}
+	var queue: Array[Vector2i] = [from]
+	while not queue.is_empty():
+		var cell: Vector2i = queue.pop_front()
+		if cell == to:
+			break
+		for dir in DIRECTIONS:
+			var next := cell + dir
+			if not previous.has(next) and not grid[next.y][next.x]:
+				previous[next] = cell
+				queue.append(next)
+
+	var path: Array[Vector2i] = []
+	if not previous.has(to):
+		return path
+	var step := to
+	while step != from:
+		path.push_front(step)
+		step = previous[step]
+	path.push_front(from)
+	return path
+
+
+# Sposta un muro lasciando il labirinto "perfetto".
+#
+# Apre un muro chiuso tra due stanze vicine: così si forma un anello, perché
+# le due stanze erano già collegate da un altro percorso. Poi chiude un
+# passaggio a caso su quel vecchio percorso, e l'anello sparisce. Risultato:
+# il labirinto cambia forma, ma ogni casella resta raggiungibile.
+#
+# `can_change` è una funzione (Callable) che riceve una casella e risponde se
+# si può modificare: per esempio "solo se è lontana dal giocatore".
+# Restituisce true se è riuscito a spostare un muro.
+static func shift_wall(grid: Array, rng: RandomNumberGenerator, can_change: Callable, attempts := 20) -> bool:
+	var height := grid.size()
+	var width := (grid[0] as Array).size()
+	for attempt in attempts:
+		# Un muro "sottile" tra due stanze ha una coordinata pari e una dispari
+		# (le stanze sono dispari-dispari, gli angoli pari-pari).
+		var wall := Vector2i(rng.randi_range(1, width - 2), rng.randi_range(1, height - 2))
+		if wall.x % 2 == wall.y % 2:
+			continue
+		if not grid[wall.y][wall.x] or not can_change.call(wall):
+			continue
+		var side := Vector2i.RIGHT if wall.x % 2 == 0 else Vector2i.DOWN
+		var path := find_path(grid, wall - side, wall + side)
+
+		# Passaggi del vecchio percorso che si possono chiudere.
+		var passages: Array[Vector2i] = []
+		for cell in path:
+			if cell.x % 2 != cell.y % 2 and can_change.call(cell):
+				passages.append(cell)
+		if passages.is_empty():
+			continue
+
+		var closed := passages[rng.randi_range(0, passages.size() - 1)]
+		_open(grid, wall)
+		grid[closed.y][closed.x] = true
+		return true
+	return false
+
+
 # Converte le coordinate di una stanza in quelle della casella corrispondente.
 static func _room_to_cell(room: Vector2i) -> Vector2i:
 	return room * 2 + Vector2i.ONE

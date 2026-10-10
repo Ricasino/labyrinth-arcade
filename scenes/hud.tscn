@@ -39,6 +39,16 @@ theme_override_constants/outline_size = 8
 theme_override_font_sizes/font_size = 32
 text = "Livello 1"
 
+[node name="TwistLabel" type="Label" parent="Root/TopBar/HBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.772549, 0.54902, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/font_size = 32
+horizontal_alignment = 1
+
 [node name="TimeLabel" type="Label" parent="Root/TopBar/HBox"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -61,6 +71,6 @@ grow_vertical = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 12
-theme_override_font_sizes/font_size = 56
+theme_override_font_sizes/font_size = 48
 horizontal_alignment = 1
 vertical_alignment = 1

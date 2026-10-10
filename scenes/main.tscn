@@ -6,14 +6,20 @@
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="4_player"]
 [ext_resource type="PackedScene" path="res://scenes/hud.tscn" id="5_hud"]
 [ext_resource type="PackedScene" path="res://scenes/touch_controls.tscn" id="6_touch"]
+[ext_resource type="Script" path="res://modifiers/modifier_def.gd" id="7_def"]
+[ext_resource type="Resource" path="res://modifiers/memory/memory.tres" id="8_memory"]
+[ext_resource type="Resource" path="res://modifiers/living_maze/living_maze.tres" id="9_living"]
 
 [node name="Main" type="Node2D" unique_id=1719102481]
 script = ExtResource("1_main")
+modifier_defs = Array[ExtResource("7_def")]([ExtResource("8_memory"), ExtResource("9_living")])
 
 [node name="Maze" type="Node2D" parent="." unique_id=1198721265]
 script = ExtResource("2_maze")
 
 [node name="Exit" parent="." unique_id=686948617 instance=ExtResource("3_exit")]
+
+[node name="Modifiers" type="Node2D" parent="."]
 
 [node name="Player" parent="." unique_id=251706883 node_paths=PackedStringArray("maze") instance=ExtResource("4_player")]
 maze = NodePath("../Maze")

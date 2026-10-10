@@ -20,6 +20,13 @@ extends Node2D
 # Casella di partenza e casella d'uscita (coordinate di griglia, non pixel).
 var start_cell := Vector2i.ZERO
 var exit_cell := Vector2i.ZERO
+# Quanto sono visibili i muri: 1 = del tutto, 0 = per niente (li nasconde la
+# variante "A memoria"). Il setter ridisegna il labirinto a ogni modifica, così
+# un Tween può animare questa proprietà.
+var walls_opacity := 1.0:
+	set(value):
+		walls_opacity = value
+		queue_redraw()
 
 # Griglia del labirinto: _grid[y][x] == true significa "muro".
 var _grid: Array = []
@@ -41,7 +48,7 @@ func generate(cols: int, rows: int) -> void:
 	start_cell = Vector2i(1, 1)
 	exit_cell = Vector2i(_width - 2, _height - 2)
 
-	queue_redraw()
+	walls_opacity = 1.0  # Assegnarla chiama anche queue_redraw().
 
 
 # true se nella casella si può camminare (dentro la griglia e non muro).
@@ -49,6 +56,20 @@ func is_walkable(cell: Vector2i) -> bool:
 	if cell.x < 0 or cell.y < 0 or cell.x >= _width or cell.y >= _height:
 		return false
 	return not _grid[cell.y][cell.x]
+
+
+# Percorso più breve tra due caselle libere (vedi MazeGenerator.find_path).
+func find_path(from: Vector2i, to: Vector2i) -> Array[Vector2i]:
+	return MazeGenerator.find_path(_grid, from, to)
+
+
+# Sposta un muro tra quelli permessi da `can_change`, senza mai lasciare
+# caselle irraggiungibili (vedi MazeGenerator.shift_wall).
+func shift_wall(rng: RandomNumberGenerator, can_change: Callable) -> bool:
+	var changed := MazeGenerator.shift_wall(_grid, rng, can_change)
+	if changed:
+		queue_redraw()
+	return changed
 
 
 # Converte una casella nella posizione (in pixel) del suo centro, relativa a
@@ -67,8 +88,17 @@ func _draw() -> void:
 	if _grid.is_empty():
 		return
 
-	# Sfondo del pavimento, un unico rettangolo grande.
-	draw_rect(Rect2(Vector2.ZERO, get_pixel_size()), floor_color)
+	# Sfondo del pavimento: un unico rettangolo che va molto oltre i bordi del
+	# labirinto, così copre anche lo spazio attorno. Ha lo stesso colore dello
+	# sfondo della finestra, ma a differenza di quello viene scurito dalle
+	# varianti che spengono la luce (CanvasModulate).
+	draw_rect(Rect2(Vector2.ZERO, get_pixel_size()).grow(10000), floor_color)
+
+	# Con walls_opacity a 0 i muri prendono il colore del pavimento e le linee
+	# diventano trasparenti: il labirinto "sparisce".
+	var fill_color := floor_color.lerp(wall_color, walls_opacity)
+	var edge_color := wall_edge_color
+	edge_color.a *= walls_opacity
 
 	var size := Vector2(tile_size, tile_size)
 	for y in _height:
@@ -76,15 +106,15 @@ func _draw() -> void:
 			if not _grid[y][x]:
 				continue
 			var top_left := Vector2(x, y) * tile_size
-			draw_rect(Rect2(top_left, size), wall_color)
+			draw_rect(Rect2(top_left, size), fill_color)
 			# Effetto "neon": una linea luminosa solo sui lati del muro che
 			# confinano con il pavimento.
 			var cell := Vector2i(x, y)
 			if is_walkable(cell + Vector2i.UP):
-				draw_line(top_left, top_left + Vector2(size.x, 0), wall_edge_color, wall_edge_width)
+				draw_line(top_left, top_left + Vector2(size.x, 0), edge_color, wall_edge_width)
 			if is_walkable(cell + Vector2i.DOWN):
-				draw_line(top_left + Vector2(0, size.y), top_left + size, wall_edge_color, wall_edge_width)
+				draw_line(top_left + Vector2(0, size.y), top_left + size, edge_color, wall_edge_width)
 			if is_walkable(cell + Vector2i.LEFT):
-				draw_line(top_left, top_left + Vector2(0, size.y), wall_edge_color, wall_edge_width)
+				draw_line(top_left, top_left + Vector2(0, size.y), edge_color, wall_edge_width)
 			if is_walkable(cell + Vector2i.RIGHT):
-				draw_line(top_left + Vector2(size.x, 0), top_left + size, wall_edge_color, wall_edge_width)
+				draw_line(top_left + Vector2(size.x, 0), top_left + size, edge_color, wall_edge_width)

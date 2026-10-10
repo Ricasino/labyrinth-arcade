@@ -23,6 +23,24 @@ func _init() -> void:
 		for attempt in 5:
 			_check_maze(Generator.generate(size.x, size.y, rng), size)
 
+	# Dopo tanti spostamenti di muri il labirinto deve restare perfetto, e le
+	# caselle "protette" (qui la colonna x = 1) non devono mai cambiare.
+	var grid := Generator.generate(15, 9, rng)
+	var protected_column: Array = []
+	for row: Array in grid:
+		protected_column.append(row[1])
+	var can_change := func(cell: Vector2i) -> bool: return cell.x != 1
+	var shifts := 0
+	for i in 300:
+		if Generator.shift_wall(grid, rng, can_change):
+			shifts += 1
+	_expect(shifts > 250, "i muri si spostano davvero")
+	_check_maze(grid, Vector2i(15, 9))
+	var column_after: Array = []
+	for row: Array in grid:
+		column_after.append(row[1])
+	_expect(column_after == protected_column, "le caselle protette non cambiano")
+
 	if _failures == 0:
 		print("OK: tutti i labirinti sono validi.")
 	quit(1 if _failures > 0 else 0)
